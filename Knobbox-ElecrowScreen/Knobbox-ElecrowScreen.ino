@@ -188,7 +188,7 @@ void setPowerButton(bool isOn) {
 
 void drawPermanentButtons() {
   for (int i = 0; i < NUMBER_OF_BUTTONS; i++) {
-    Serial.println("Button 1 is function " + String(fButtons[i].isFunction));
+    //Serial.println("Button 1 is function " + String(fButtons[i].isFunction));
     if (!fButtons[i].isFunction) {
       lcd.drawRect(fButtons[i].tftX, fButtons[i].tftY, (fButtons[i].tftXEnd - fButtons[i].tftX), (fButtons[i].tftYEnd - fButtons[i].tftY), fButtons[i].boxColour);
       lcd.setTextColor(fButtons[i].textColour, TFT_BLACK);
@@ -206,7 +206,7 @@ void drawFunctionButtons(int throttleIndex) {
     if (fButtons[i].isFunction && throttles[throttleIndex].isSelected) {
       fButtonIndex++;
       bool state = roster[throttles[throttleIndex].rosterIndex].functionState[fButtonIndex];
-      Serial.println("Button " + String(fButtonIndex) + " function state " + String(state));
+      //Serial.println("Button " + String(fButtonIndex) + " function state " + String(state));
       if (state == false) {
         lcd.fillRect(fButtons[i].tftX, fButtons[i].tftY, (fButtons[i].tftXEnd - fButtons[i].tftX), (fButtons[i].tftYEnd - fButtons[i].tftY), TFT_BLACK);
         lcd.drawRect(fButtons[i].tftX, fButtons[i].tftY, (fButtons[i].tftXEnd - fButtons[i].tftX), (fButtons[i].tftYEnd - fButtons[i].tftY), fButtons[i].boxColour);
@@ -235,9 +235,9 @@ void drawSelectedThrottle (int i) {
   int value = throttles[i].speedStep;
   if (value < 0) value = 0;
   if (roster[throttles[i].rosterIndex].currentDirection < 1)
-    ringMeter(value, 0, 128, 345, 180, 104, "R" , GREEN2RED);
+    ringMeter(value, 0, 128, 340, 160, 104, "R" , GREEN2RED);
   else
-    ringMeter(value, 0, 128, 345, 180, 104, "F" , GREEN2RED);
+    ringMeter(value, 0, 128, 340, 160, 104, "F" , GREEN2RED);
 }
 
 void drawSelectedThrottleSignal(int i) {
@@ -318,10 +318,18 @@ void messageReceived(String &topic, String &payload) {
     else if (topic == selectorMovementTopic && throttles[i].isSelected) {
       if (payload == "C") {
         throttles[i].currentSelectorRosterIndex++;
+        if (throttles[i].currentSelectorRosterIndex >= rosterCounter)
+        {
+          throttles[i].currentSelectorRosterIndex = rosterCounter - 1;
+        }
         updateSelector(throttles[i].currentSelectorRosterIndex);
       }
       else if (payload == "AC") {
         throttles[i].currentSelectorRosterIndex--;
+        if (throttles[i].currentSelectorRosterIndex < 0)
+        {
+          throttles[i].currentSelectorRosterIndex = 0;
+        }
         updateSelector(throttles[i].currentSelectorRosterIndex);
       }
       else if (payload = "SEL") {
@@ -331,12 +339,18 @@ void messageReceived(String &topic, String &payload) {
     else if (topic == speedMovementTopic && throttles[i].isSelected) {
       if (payload == "C") {
         changeSpeed(i, 1);
+        drawThrottle(i);
+        drawSelectedThrottle(i);
       }
       else if (payload == "AC") {
         changeSpeed(i, -1);
+        drawThrottle(i);
+        drawSelectedThrottle(i);
       }
       else if (payload = "SEL") {
         changeSpeed(i, 0);
+        drawThrottle(i);
+        drawSelectedThrottle(i);
       }
     }
   }
@@ -379,8 +393,8 @@ void changeSelectedLoco(int throttleIndex) {
     lcd.fillRect(580, 130, 220, 350, TFT_BLACK);
 
     drawSelectedThrottle(throttleIndex);
-    drawSelectedTrainNameCentered(455, 30, roster[throttles[throttleIndex].rosterIndex].Name, 4);
-    drawSelectedTrainNameCentered(455, 80, String(roster[throttles[throttleIndex].rosterIndex].Id), 4);
+    drawSelectedTrainNameCentered(445, 30, roster[throttles[throttleIndex].rosterIndex].Name, 4);
+    drawSelectedTrainNameCentered(445, 80, String(roster[throttles[throttleIndex].rosterIndex].Id), 4);
     drawSelectedThrottleSignal(throttleIndex);
     drawFunctionButtons(throttleIndex);
 
@@ -390,17 +404,19 @@ void changeSelectedLoco(int throttleIndex) {
 
 void changeSpeed(int throttleIndex, int speedChange) {
   if (throttleIndex < 0 || throttleIndex > NUMBER_OF_THROTTLES) return;
+  int newSpeed =  throttles[throttleIndex].speedStep + speedChange;
+  if (newSpeed < 0) newSpeed = 0;
+  if (newSpeed > 126) newSpeed = 126;
   if (speedChange == 0) {
     throttles[throttleIndex].speedStep = 0;
   }
   else {
-    throttles[throttleIndex].speedStep = throttles[throttleIndex].speedStep + speedChange;
+    throttles[throttleIndex].speedStep = newSpeed;
   }
 
   String spd = "M" + throttles[throttleIndex].mtIndex + "A" + roster[throttles[throttleIndex].rosterIndex].IdType + roster[throttles[throttleIndex].rosterIndex].Id + "<;>V" + String(throttles[throttleIndex].speedStep) + "\n";
   Serial.print("New speed " + String(throttles[throttleIndex].speedStep) + " writing " + spd);
   writeString(spd);
-  drawThrottle(throttleIndex);
 }
 
 void loop() {
@@ -503,7 +519,7 @@ void processButtonPress(int buttonIndex, bool pressed) {
       if (throttles[i].isSelected && throttles[i].rosterIndex >= 0) {
         String func = "M" + throttles[i].mtIndex + "A" + roster[throttles[i].rosterIndex].IdType + roster[throttles[i].rosterIndex].Id + "<;>F" + String(pressed) + String(fButtons[buttonIndex].functionIndex) + "\n";
         writeString(func);
-        Serial.println("Function string " + func);
+        //Serial.println("Function string " + func);
         drawFunctionButtons(throttles[i].rosterIndex);
       }
     }
@@ -569,8 +585,8 @@ void selectThrottle(int throttleIndex) {
     Serial.println("throttle " + String(throttleIndex) + " selected");
     if (throttles[throttleIndex].rosterIndex >= 0) {
       drawSelectedThrottle(throttleIndex);
-      drawSelectedTrainNameCentered(455, 30, roster[throttles[throttleIndex].rosterIndex].Name, 4);
-      drawSelectedTrainNameCentered(455, 80, String(roster[throttles[throttleIndex].rosterIndex].Id), 4);
+      drawSelectedTrainNameCentered(445, 30, roster[throttles[throttleIndex].rosterIndex].Name, 4);
+      drawSelectedTrainNameCentered(445, 80, String(roster[throttles[throttleIndex].rosterIndex].Id), 4);
       drawSelectedThrottleSignal(throttleIndex);
       drawFunctionButtons(throttleIndex);
     }
@@ -727,7 +743,7 @@ void readFromWiiTHrottle() {
         int iFunctionState = functionState.toInt();
         int iFunctionAddress = functionAddress.toInt();
 
-        Serial.println("Function - " + roster[rosterIndexToUpdate].Name + "storing state " + functionState + " for address " + functionAddress);
+        //Serial.println("Function - " + roster[rosterIndexToUpdate].Name + "storing state " + functionState + " for address " + functionAddress);
 
         if (iFunctionAddress < maxFunctions) {
           roster[rosterIndexToUpdate].functionState[iFunctionAddress] = iFunctionState;
@@ -1000,7 +1016,7 @@ int ringMeter(int value, int vmin, int vmax, int x, int y, int r, char *units, b
 
     // Print units, if the meter is large then use big font 4, othewise use 2
     lcd.setTextColor(TFT_WHITE, TFT_BLACK);
-    Serial.println(units);
+    //Serial.println(units);
     if (r > 84) {
       //int padding = tft.textWidth("Word", 4);
       lcd.setTextPadding(50);

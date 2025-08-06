@@ -16,4 +16,5 @@ Throttle::Throttle(String MTIndex, int tftLocationX, int tftLocationY, int tftLo
   newSelectedRosterIndex = -1;
   isSelected = false;
   rosterIndex = -1;
+  currentSelectorRosterIndex = -1;
 }
