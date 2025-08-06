@@ -469,7 +469,7 @@ void loop() {
           if (fButtons[i].isFunction) {
             processButtonPress(i, false);
           }
-          
+
           Serial.println("Button " + String(i) + " released");
 
         }
@@ -482,6 +482,19 @@ void processButtonPress(int buttonIndex, bool pressed) {
   Serial.println("Process button press " + String(buttonIndex) + " - " + String(pressed) + " is func " + String(fButtons[buttonIndex].isFunction));
   if (fButtons[buttonIndex].functionIndex == 999) {
     //release selected loco
+    for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
+      if (throttles[i].isSelected && throttles[i].rosterIndex >= 0) {
+        String rel = "M" + throttles[i].mtIndex + "-" + roster[throttles[i].rosterIndex].IdType + roster[throttles[i].rosterIndex].Id + "<;>r\n";
+        Serial.print("Released else Write " + rel);
+        writeString(rel);
+        mqttClient.unsubscribe(cabSignalTopic + roster[throttles[i].rosterIndex].Id);
+
+        throttles[i].TrainName = "";
+        throttles[i].rosterIndex = -1;
+
+        selectThrottle(i);
+      }
+    }
   }
   else if (fButtons[buttonIndex].isFunction) {
     //function button press
@@ -496,13 +509,21 @@ void processButtonPress(int buttonIndex, bool pressed) {
     }
 
   }
-  else if (fButtons[buttonIndex].buttonText = "Track power") {
+  else if (fButtons[buttonIndex].buttonText == "Track power") {
     //track power
     trackPowerState = !trackPowerState;
     writeString("PPA" + String(trackPowerState) + "\n"); //send power instruction to WT
-    Serial.println("Track power "+String(trackPowerState));
+    Serial.println("Track power " + String(trackPowerState));
   }
-  else if (fButtons[buttonIndex].buttonText = "Stop all trains") {
+  else if (fButtons[buttonIndex].buttonText == "Stop all trains") {
+    for (int i = 0; i  < NUMBER_OF_THROTTLES; i++) {
+      if (throttles[i].rosterIndex >= 0) {
+        String spd = "M" + throttles[i].mtIndex + "A" + roster[throttles[i].rosterIndex].IdType + roster[throttles[i].rosterIndex].Id + "<;>X\n";
+        Serial.print("New speed ES writing " + spd);
+        writeString(spd);
+        //drawThrottle(throttleIndex);
+      }
+    }
 
   }
 }
@@ -602,7 +623,7 @@ void readFromWiiTHrottle() {
     if (x == '\n') {
       //Serial.println(receivedLine);
       String cTrackPowerState = receivedLine.substring(3, 4);
-      Serial.println("Track power message "+cTrackPowerState+" - ");
+      Serial.println("Track power message " + cTrackPowerState + " - ");
       if (cTrackPowerState == "1") {
         trackPowerState = true;
       }
