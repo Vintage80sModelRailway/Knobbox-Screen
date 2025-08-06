@@ -7,7 +7,7 @@
 #include "gfx_conf.h"
 
 #define NUMBER_OF_THROTTLES 6
-#define NUMBER_OF_BUTTONS 20
+#define NUMBER_OF_BUTTONS 21
 #define ROSTER_SIZE 30
 #define TFT_GREY 0x5AEB
 #define RED2RED 0
@@ -28,6 +28,7 @@ String delimeter = "";
 String receivedLine = "";
 int locoArrayCounter = 0;
 int rosterCounter = 0;
+int maxFunctions = 68;
 bool rosterCollecting = false;
 bool actionCollecting = false;
 bool trackPowerCollecting = false;
@@ -35,6 +36,7 @@ bool trackPowerState = false;
 String actionReceivedLine = "";
 String actionControllerIndex = "";
 int numberOfLocosInRoster = -1;
+bool screenPressDetected = false;
 RosterEntry currentLoco;
 RosterEntry roster[ROSTER_SIZE];
 
@@ -46,6 +48,7 @@ const char * server = "192.168.1.29";
 String cabSignalTopic = "layout/cabsignal/";
 String locoMovementTopic = "layout/locomovement/";
 String selectorMovementTopic = "layout/selectormovement/";
+String speedMovementTopic = "layout/speedmovement/";
 
 WiFiClient wifiClient;
 WiFiClient wifiClientMQTT;
@@ -63,64 +66,32 @@ Throttle throttles[NUMBER_OF_THROTTLES] = {
 ScreenButton fButtons[NUMBER_OF_BUTTONS] = {
   ScreenButton("Track power", 600, 0, 780, 40, TFT_GREEN, TFT_WHITE, TFT_BLACK),
   ScreenButton("Stop all trains", 600, 60, 780, 100, TFT_RED, TFT_WHITE, TFT_BLACK),
-  ScreenButton("F1", 580, 130, 640, 170, TFT_WHITE, TFT_WHITE, TFT_BLACK, 0),
-  ScreenButton("F2", 650, 130, 710, 170, TFT_WHITE, TFT_WHITE, TFT_BLACK, 1),
-  ScreenButton("F3", 720, 130, 780, 170, TFT_WHITE, TFT_WHITE, TFT_BLACK, 2),
-  ScreenButton("F4", 580, 190, 640, 230, TFT_WHITE, TFT_WHITE, TFT_BLACK, 3),
-  ScreenButton("F5", 650, 190, 710, 230, TFT_WHITE, TFT_WHITE, TFT_BLACK, 4),
-  ScreenButton("F6", 720, 190, 780, 230, TFT_WHITE, TFT_WHITE, TFT_BLACK, 5),
-  ScreenButton("F7", 580, 250, 640, 290, TFT_WHITE, TFT_WHITE, TFT_BLACK, 6),
-  ScreenButton("F8", 650, 250, 710, 290, TFT_WHITE, TFT_WHITE, TFT_BLACK, 7),
-  ScreenButton("F9", 720, 250, 780, 290, TFT_WHITE, TFT_WHITE, TFT_BLACK, 8),
-  ScreenButton("F10", 580, 310, 640, 350, TFT_WHITE, TFT_WHITE, TFT_BLACK, 9),
-  ScreenButton("F11", 650, 310, 710, 350, TFT_WHITE, TFT_WHITE, TFT_BLACK, 10),
-  ScreenButton("F12", 720, 310, 780, 350, TFT_WHITE, TFT_WHITE, TFT_BLACK, 11),
-  ScreenButton("F13", 580, 370, 640, 410, TFT_WHITE, TFT_WHITE, TFT_BLACK, 12),
-  ScreenButton("F14", 650, 370, 710, 410, TFT_WHITE, TFT_WHITE, TFT_BLACK, 13),
-  ScreenButton("F15", 720, 370, 780, 410, TFT_WHITE, TFT_WHITE, TFT_BLACK, 14),
-  ScreenButton("F16", 580, 430, 640, 470, TFT_WHITE, TFT_WHITE, TFT_BLACK, 15),
-  ScreenButton("F17", 650, 430, 710, 470, TFT_WHITE, TFT_WHITE, TFT_BLACK, 16),
-  ScreenButton("F18", 720, 430, 780, 470, TFT_WHITE, TFT_WHITE, TFT_BLACK, 17)
+  ScreenButton("F0", 580, 130, 640, 170, TFT_WHITE, TFT_WHITE, TFT_BLACK, 0),
+  ScreenButton("F1", 650, 130, 710, 170, TFT_WHITE, TFT_WHITE, TFT_BLACK, 1),
+  ScreenButton("F2", 720, 130, 780, 170, TFT_WHITE, TFT_WHITE, TFT_BLACK, 2),
+  ScreenButton("F3", 580, 190, 640, 230, TFT_WHITE, TFT_WHITE, TFT_BLACK, 3),
+  ScreenButton("F4", 650, 190, 710, 230, TFT_WHITE, TFT_WHITE, TFT_BLACK, 4),
+  ScreenButton("F5", 720, 190, 780, 230, TFT_WHITE, TFT_WHITE, TFT_BLACK, 5),
+  ScreenButton("F6", 580, 250, 640, 290, TFT_WHITE, TFT_WHITE, TFT_BLACK, 6),
+  ScreenButton("F7", 650, 250, 710, 290, TFT_WHITE, TFT_WHITE, TFT_BLACK, 7),
+  ScreenButton("F8", 720, 250, 780, 290, TFT_WHITE, TFT_WHITE, TFT_BLACK, 8),
+  ScreenButton("F9", 580, 310, 640, 350, TFT_WHITE, TFT_WHITE, TFT_BLACK, 9),
+  ScreenButton("F10", 650, 310, 710, 350, TFT_WHITE, TFT_WHITE, TFT_BLACK, 10),
+  ScreenButton("F11", 720, 310, 780, 350, TFT_WHITE, TFT_WHITE, TFT_BLACK, 11),
+  ScreenButton("F12", 580, 370, 640, 410, TFT_WHITE, TFT_WHITE, TFT_BLACK, 12),
+  ScreenButton("F13", 650, 370, 710, 410, TFT_WHITE, TFT_WHITE, TFT_BLACK, 13),
+  ScreenButton("F14", 720, 370, 780, 410, TFT_WHITE, TFT_WHITE, TFT_BLACK, 14),
+  ScreenButton("F15", 580, 430, 640, 470, TFT_WHITE, TFT_WHITE, TFT_BLACK, 15),
+  ScreenButton("F16", 650, 430, 710, 470, TFT_WHITE, TFT_WHITE, TFT_BLACK, 16),
+  ScreenButton("F17", 720, 430, 780, 470, TFT_WHITE, TFT_WHITE, TFT_BLACK, 17),
+  ScreenButton("Release", 360, 400, 540, 440, TFT_RED, TFT_WHITE, TFT_BLACK, 999)
 };
 
 void setup() {
-  /*
-    #if defined (CrowPanel_50) || defined (CrowPanel_70)
-    pinMode(38, OUTPUT);
-    digitalWrite(38, LOW);
-    pinMode(17, OUTPUT);
-    digitalWrite(17, LOW);
-    pinMode(18, OUTPUT);
-    digitalWrite(18, LOW);
-    pinMode(42, OUTPUT);
-    digitalWrite(42, LOW);
-    #elif defined (CrowPanel_43)
-    pinMode(20, OUTPUT);
-    digitalWrite(20, LOW);
-    pinMode(19, OUTPUT);
-    digitalWrite(19, LOW);
-    pinMode(35, OUTPUT);
-    digitalWrite(35, LOW);
-    pinMode(38, OUTPUT);
-    digitalWrite(38, LOW);
-    pinMode(0, OUTPUT);//TOUCH-CS
-    #endif
-  */
   Serial.begin (19200);
-
-  //pinMode(38, OUTPUT);
-  //digitalWrite(38, LOW);
-
   lcd.init();
-
-  //tft.setRotation(0);
-  //if (tft.width() < tft.height()) tft.setRotation(tft.getRotation() ^ 1);
   lcd.fillScreen(TFT_BLACK);
-
   WiFi.begin(ssid, password);
-
-
-  Serial.println("Init");
 
   int tryDelay = 500;
   int numberOfTries = 20;
@@ -148,16 +119,12 @@ void setup() {
       case WL_CONNECTED:
         Serial.println("[WiFi] WiFi connected!");
         Serial.print("[WiFi] IP address: ");
-        //String ip = "";// WiFi.localIP();
-        //scrollToScreen("IP address: "+ip);
         Serial.println(WiFi.localIP());
-
         isConnected = true;
         break;
       default:
         Serial.print("[WiFi] WiFi Status: ");
         Serial.println(WiFi.status());
-        //scrollToScreen("WiFi Status: "+WiFi.status());
         break;
     }
     delay(tryDelay);
@@ -175,7 +142,6 @@ void setup() {
   mqttClient.setKeepAlive(360);
   mqttClient.setTimeout(360);
   mqttClient.onMessage(messageReceived);
-
   connect();
 
   if (!wifiClient.connect(IPAddress(192, 168, 1, 29), 12090)) {
@@ -189,7 +155,6 @@ void setup() {
   locoName = "";
 
   for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
-    //clearThrottleScreen(i);
     clearThrottle(i);
   }
   drawPermanentButtons();
@@ -233,12 +198,17 @@ void drawPermanentButtons() {
   }
 }
 
-void drawFunctionButtons(int rosterIndex) {
+void drawFunctionButtons(int throttleIndex) {
+
+  int fButtonIndex = -1;
   for (int i = 0; i < NUMBER_OF_BUTTONS; i++) {
-    Serial.println("Button 1 is function " + String(fButtons[i].isFunction));
-    if (fButtons[i].isFunction) {
-      bool state = roster[rosterIndex].functionState[i];
+    //Serial.println("Button 1 is function " + String(fButtons[i].isFunction));
+    if (fButtons[i].isFunction && throttles[throttleIndex].isSelected) {
+      fButtonIndex++;
+      bool state = roster[throttles[throttleIndex].rosterIndex].functionState[fButtonIndex];
+      Serial.println("Button " + String(fButtonIndex) + " function state " + String(state));
       if (state == false) {
+        lcd.fillRect(fButtons[i].tftX, fButtons[i].tftY, (fButtons[i].tftXEnd - fButtons[i].tftX), (fButtons[i].tftYEnd - fButtons[i].tftY), TFT_BLACK);
         lcd.drawRect(fButtons[i].tftX, fButtons[i].tftY, (fButtons[i].tftXEnd - fButtons[i].tftX), (fButtons[i].tftYEnd - fButtons[i].tftY), fButtons[i].boxColour);
         lcd.setTextColor(fButtons[i].textColour, TFT_BLACK);
         int middle = (fButtons[i].tftXEnd - fButtons[i].tftX) / 2;
@@ -251,7 +221,7 @@ void drawFunctionButtons(int rosterIndex) {
         lcd.drawCentreString(fButtons[i].buttonText, fButtons[i].tftX + middle, fButtons[i].tftY + 10, 4);
       }
     }
-    else {
+    else if (!fButtons[i].isFunction) {
       lcd.drawRect(fButtons[i].tftX, fButtons[i].tftY, (fButtons[i].tftXEnd - fButtons[i].tftX), (fButtons[i].tftYEnd - fButtons[i].tftY), fButtons[i].boxColour);
       lcd.setTextColor(fButtons[i].textColour, TFT_BLACK);
       int middle = (fButtons[i].tftXEnd - fButtons[i].tftX) / 2;
@@ -261,13 +231,13 @@ void drawFunctionButtons(int rosterIndex) {
 }
 
 void drawSelectedThrottle (int i) {
-  //800 width
-  //small throttles go to 320
-  //800 - 320 = 580
-  //270?
-  //320 - 590?
-
-  ringMeter(throttles[i].SpeedStep, 0, 128, 345, 130, 104, "F" , GREEN2RED);
+  Serial.println("Draw selected current dir " + String(roster[throttles[i].rosterIndex].currentDirection));
+  int value = throttles[i].speedStep;
+  if (value < 0) value = 0;
+  if (roster[throttles[i].rosterIndex].currentDirection < 1)
+    ringMeter(value, 0, 128, 345, 180, 104, "R" , GREEN2RED);
+  else
+    ringMeter(value, 0, 128, 345, 180, 104, "F" , GREEN2RED);
 }
 
 void drawSelectedThrottleSignal(int i) {
@@ -286,26 +256,27 @@ void drawSelectedThrottleSignal(int i) {
       break;
   }
   if (colour > 0)
-    lcd.fillCircle(445, 400, 25, colour);
+    lcd.fillCircle(520, 130, 25, colour);
   else {
-    lcd.fillCircle(445, 400, 25, TFT_BLACK);
-    lcd.drawCircle(445, 400, 25, TFT_GREEN);
+    lcd.fillCircle(520, 130, 25, TFT_BLACK);
+    lcd.drawCircle(520, 130, 25, TFT_GREEN);
   }
 }
 
 void drawThrottle(int i) {
-  //lcd.fillRect(throttles[i].tftX, throttles[i].tftY, 160, 160, TFT_BLACK);
-
+  Serial.println("Draw current dir " + String(roster[throttles[i].rosterIndex].currentDirection));
+  int value = throttles[i].speedStep;
+  if (value < 0) value = 0;
   if (throttles[i].isSelected == true) {
-    if (roster[throttles[i].rosterIndex].currentDirection < 1) ringMeter(throttles[i].SpeedStep, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "R" , GREEN2RED); // Draw analogue meter
-    else ringMeter(throttles[i].SpeedStep, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "F" , GREEN2RED); // Draw analogue meter
+    if (roster[throttles[i].rosterIndex].currentDirection < 1) ringMeter(value, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "R" , GREEN2RED); // Draw analogue meter
+    else ringMeter(value, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "F" , GREEN2RED); // Draw analogue meter
     Serial.println("Draw throttle - " + String(i) + " is selected");
-
     lcd.drawRect(throttles[i].tftX, throttles[i].tftY, 159, 159, TFT_RED);
   }
   else {
-    if (roster[throttles[i].rosterIndex].currentDirection < 1) ringMeter(throttles[i].SpeedStep, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "R" , GREEN2RED); // Draw analogue meter
-    else ringMeter(throttles[i].SpeedStep, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "F" , GREEN2RED); // Draw analogue meter
+    Serial.println("Draw throttle - " + String(i) + " is not selected");
+    if (roster[throttles[i].rosterIndex].currentDirection < 1) ringMeter(value, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "R" , GREEN2RED); // Draw analogue meter
+    else ringMeter(value, 0, 128, throttles[i].tftX + METERXOFFSET, throttles[i].tftY + METERYOFFSET, 52, "F" , GREEN2RED); // Draw analogue meter
   }
 }
 
@@ -313,11 +284,9 @@ void updateSelector(int currentlySelectedRosterIndex) {
   if (currentlySelectedRosterIndex < 0 || currentlySelectedRosterIndex >= ROSTER_SIZE) return;
   lcd.fillRect(320, 0, 270, 480, TFT_BLACK);
   lcd.fillRect(580, 130, 220, 350, TFT_BLACK);
-  //320 160
-  drawSelectedTrainNameCentered(560, 160, "Select loco",4);
-  drawSelectedTrainNameCentered(560, 240, roster[currentlySelectedRosterIndex].Name,4);
-  drawSelectedTrainNameCentered(560, 320, String(roster[currentlySelectedRosterIndex].Id),4);
-
+  drawSelectedTrainNameCentered(560, 160, "Select loco", 4);
+  drawSelectedTrainNameCentered(560, 240, roster[currentlySelectedRosterIndex].Name, 4);
+  drawSelectedTrainNameCentered(560, 320, String(roster[currentlySelectedRosterIndex].Id), 4);
 }
 
 void clearThrottle(int i) {
@@ -356,10 +325,82 @@ void messageReceived(String &topic, String &payload) {
         updateSelector(throttles[i].currentSelectorRosterIndex);
       }
       else if (payload = "SEL") {
-
+        changeSelectedLoco(i);
+      }
+    }
+    else if (topic == speedMovementTopic && throttles[i].isSelected) {
+      if (payload == "C") {
+        changeSpeed(i, 1);
+      }
+      else if (payload == "AC") {
+        changeSpeed(i, -1);
+      }
+      else if (payload = "SEL") {
+        changeSpeed(i, 0);
       }
     }
   }
+}
+
+void changeSelectedLoco(int throttleIndex) {
+  //deselect train from MT
+  throttles[throttleIndex].TrainName = "";
+  throttles[throttleIndex].rosterIndex = -1;
+  if (throttles[throttleIndex].currentSelectorRosterIndex > -1) {
+    Serial.println("Select new loco detected - assign currently selected train - " + roster[throttles[throttleIndex].currentSelectorRosterIndex].Name);
+    throttles[throttleIndex].TrainName = roster[throttles[throttleIndex].currentSelectorRosterIndex].Name;
+    throttles[throttleIndex].signalAspect = 'X';
+
+    if (throttles[throttleIndex].rosterIndex >= 0) {
+      String rel = "M" + throttles[throttleIndex].mtIndex + "-" + roster[throttles[throttleIndex].rosterIndex].IdType + roster[throttles[throttleIndex].rosterIndex].Id + "<;>r\n";
+      Serial.print("Released else Write " + rel);
+      writeString(rel);
+      mqttClient.unsubscribe(cabSignalTopic + roster[throttles[throttleIndex].rosterIndex].Id);
+    }
+
+    //Handle newly assigned loco
+    throttles[throttleIndex].rosterIndex = throttles[throttleIndex].currentSelectorRosterIndex;
+    String assign = "M" + throttles[throttleIndex].mtIndex + "+" + roster[throttles[throttleIndex].currentSelectorRosterIndex].IdType +  roster[throttles[throttleIndex].currentSelectorRosterIndex].Id + "<;>" + roster[throttles[throttleIndex].currentSelectorRosterIndex].IdType +  roster[throttles[throttleIndex].currentSelectorRosterIndex].Id + "\n";
+    Serial.print("Assigned Write " + assign);
+
+    writeString(assign);
+
+    mqttClient.subscribe(cabSignalTopic + roster[throttles[throttleIndex].rosterIndex].Id);
+    Serial.println("Sub " + cabSignalTopic + roster[throttles[throttleIndex].rosterIndex].Id);
+    throttles[throttleIndex].signalAspect = 'A';
+    throttles[throttleIndex].speedStep = 0;
+    clearThrottleScreen(throttleIndex);
+    drawThrottle(throttleIndex);
+    //drawTrainName(throttles[throttleIndex].tftX, throttles[throttleIndex].tftY, throttles[throttleIndex].TrainName);
+    drawTrainNameCentered(throttles[throttleIndex].tftX, throttles[throttleIndex].tftY, throttles[throttleIndex].TrainName);
+    drawSignal(throttleIndex);
+
+    lcd.fillRect(320, 0, 270, 480, TFT_BLACK);
+    lcd.fillRect(580, 130, 220, 350, TFT_BLACK);
+
+    drawSelectedThrottle(throttleIndex);
+    drawSelectedTrainNameCentered(455, 30, roster[throttles[throttleIndex].rosterIndex].Name, 4);
+    drawSelectedTrainNameCentered(455, 80, String(roster[throttles[throttleIndex].rosterIndex].Id), 4);
+    drawSelectedThrottleSignal(throttleIndex);
+    drawFunctionButtons(throttleIndex);
+
+    roster[throttles[throttleIndex].rosterIndex].initialResponseIncoming = true;
+  }
+}
+
+void changeSpeed(int throttleIndex, int speedChange) {
+  if (throttleIndex < 0 || throttleIndex > NUMBER_OF_THROTTLES) return;
+  if (speedChange == 0) {
+    throttles[throttleIndex].speedStep = 0;
+  }
+  else {
+    throttles[throttleIndex].speedStep = throttles[throttleIndex].speedStep + speedChange;
+  }
+
+  String spd = "M" + throttles[throttleIndex].mtIndex + "A" + roster[throttles[throttleIndex].rosterIndex].IdType + roster[throttles[throttleIndex].rosterIndex].Id + "<;>V" + String(throttles[throttleIndex].speedStep) + "\n";
+  Serial.print("New speed " + String(throttles[throttleIndex].speedStep) + " writing " + spd);
+  writeString(spd);
+  drawThrottle(throttleIndex);
 }
 
 void loop() {
@@ -383,21 +424,87 @@ void loop() {
     Serial.println("MQTT client disc");
     connect();
   }
+
+  for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
+    if (throttles[i].rosterIndex >= 0 && throttles[i].rosterIndex < ROSTER_SIZE) {
+      if (roster[throttles[i].rosterIndex].functionButtonUpdateRequired) {
+        drawFunctionButtons(i);
+        roster[throttles[i].rosterIndex].functionButtonUpdateRequired = false;
+      }
+    }
+  }
+
   int32_t x, y;
   if (lcd.getTouch(&x, &y)) {
-    if (x != lastTouchX || y != lastTouchY) {
-      Serial.printf("X:%d Y:%d\n", x, y);
-      lcd.fillCircle(x, y, 15, TFT_WHITE);
+    //Serial.printf("X:%d Y:%d\n", x, y);
+    //lcd.fillCircle(x, y, 15, TFT_WHITE);
+    if (!screenPressDetected) {
       int throttleIndex = GetThrottleIndexFromXY(x, y);
       Serial.println("Throttle index " + String(throttleIndex));
       if (throttleIndex >= 0 && throttleIndex < NUMBER_OF_THROTTLES) {
         selectThrottle(throttleIndex);
       }
+      else {
+        //could be a button
+        int buttonIndex = GetButtonIndexFromXY(x, y);
+        if (buttonIndex >= 0) {
+          Serial.println ("Button index pressed " + String(buttonIndex));
+          if (!fButtons[buttonIndex].isSelected) {
+            fButtons[buttonIndex].isSelected = true;
+            processButtonPress(buttonIndex, true);
+            //drawFunctionButtons();
+          }
+        }
+      }
+      screenPressDetected = true;
+    }
+  }
+  else {
+    //Serial.println("No touch");
+    if (screenPressDetected) {
+      screenPressDetected = false;
+      for (int i = 0; i < NUMBER_OF_BUTTONS; i++) {
+        if (fButtons[i].isSelected) {
+          fButtons[i].isSelected = false;
+          if (fButtons[i].isFunction) {
+            processButtonPress(i, false);
+          }
+          
+          Serial.println("Button " + String(i) + " released");
+
+        }
+      }
+    }
+  }
+}
+
+void processButtonPress(int buttonIndex, bool pressed) {
+  Serial.println("Process button press " + String(buttonIndex) + " - " + String(pressed) + " is func " + String(fButtons[buttonIndex].isFunction));
+  if (fButtons[buttonIndex].functionIndex == 999) {
+    //release selected loco
+  }
+  else if (fButtons[buttonIndex].isFunction) {
+    //function button press
+    Serial.println("Is function " + String(buttonIndex));
+    for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
+      if (throttles[i].isSelected && throttles[i].rosterIndex >= 0) {
+        String func = "M" + throttles[i].mtIndex + "A" + roster[throttles[i].rosterIndex].IdType + roster[throttles[i].rosterIndex].Id + "<;>F" + String(pressed) + String(fButtons[buttonIndex].functionIndex) + "\n";
+        writeString(func);
+        Serial.println("Function string " + func);
+        drawFunctionButtons(throttles[i].rosterIndex);
+      }
     }
 
   }
-  lastTouchX = x;
-  lastTouchY = y;
+  else if (fButtons[buttonIndex].buttonText = "Track power") {
+    //track power
+    trackPowerState = !trackPowerState;
+    writeString("PPA" + String(trackPowerState) + "\n"); //send power instruction to WT
+    Serial.println("Track power "+String(trackPowerState));
+  }
+  else if (fButtons[buttonIndex].buttonText = "Stop all trains") {
+
+  }
 }
 
 int GetThrottleIndexFromXY(int32_t x, int32_t y) {
@@ -413,8 +520,23 @@ int GetThrottleIndexFromXY(int32_t x, int32_t y) {
   return throttleIndex;
 }
 
+int GetButtonIndexFromXY(int32_t x, int32_t y) {
+  int buttonIndex = -1;
+  for (int i = 0; i < NUMBER_OF_BUTTONS; i++) {
+    //Serial.println("X "+String(x)+" Y "+String(y));
+    //Serial.println(String(throttles[i].tftX)+"  "+throttles[i].tftY+" "+String(throttles[i].tftXEbd)+" "+String(throttles[i].tftYEnd));
+    if (x >= fButtons[i].tftX && y >= fButtons[i].tftY && x < fButtons[i].tftXEnd && y < fButtons[i].tftYEnd) {
+      buttonIndex = i;
+      break;
+    }
+  }
+  return buttonIndex;
+}
+
 void selectThrottle(int throttleIndex) {
   Serial.println("Starting selectThrottle - " + String(throttles[throttleIndex].isSelected) + "; " + String(throttleIndex));
+  lcd.fillRect(320, 0, 270, 480, TFT_BLACK);
+  lcd.fillRect(580, 130, 220, 350, TFT_BLACK);
   if (throttles[throttleIndex].isSelected == true) {
     throttles[throttleIndex].isSelected = false;
     Serial.println("throttle " + String(throttleIndex) + " unselected");
@@ -423,23 +545,40 @@ void selectThrottle(int throttleIndex) {
   }
   else {
     throttles[throttleIndex].isSelected = true;
+    Serial.println("throttle " + String(throttleIndex) + " selected");
     if (throttles[throttleIndex].rosterIndex >= 0) {
       drawSelectedThrottle(throttleIndex);
-      drawSelectedTrainNameCentered(455, 30, roster[throttles[throttleIndex].rosterIndex].Name,4);
-      drawSelectedTrainNameCentered(455, 80, String(roster[throttles[throttleIndex].rosterIndex].Id),4);
+      drawSelectedTrainNameCentered(455, 30, roster[throttles[throttleIndex].rosterIndex].Name, 4);
+      drawSelectedTrainNameCentered(455, 80, String(roster[throttles[throttleIndex].rosterIndex].Id), 4);
       drawSelectedThrottleSignal(throttleIndex);
-      drawFunctionButtons(throttles[throttleIndex].rosterIndex);
+      drawFunctionButtons(throttleIndex);
     }
-
-    Serial.println("throttle " + String(throttleIndex) + " selected");
   }
-  clearThrottle(throttleIndex);
+
+  if (throttles[throttleIndex].rosterIndex >= 0) {
+    clearThrottleScreen(throttleIndex);
+    drawThrottle(throttleIndex);
+    drawTrainNameCentered(throttles[throttleIndex].tftX, throttles[throttleIndex].tftY, throttles[throttleIndex].TrainName);
+    drawSignal(throttleIndex);
+  }
+  else {
+    clearThrottle(throttleIndex);
+  }
 
   for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
     if (i != throttleIndex && throttles[i].isSelected == true) {
       throttles[i].isSelected = false;
       //Serial.println("loop throttle "+String(i)+" unselected");
-      clearThrottle(i);
+      if (throttles[i].rosterIndex >= 0) {
+        clearThrottleScreen(i);
+        drawThrottle(i);
+        drawTrainNameCentered(throttles[i].tftX, throttles[i].tftY, throttles[i].TrainName);
+        drawSignal(i);
+      }
+      else {
+        clearThrottle(i);
+      }
+
     }
   }
   Serial.println("Finished selectThrottle");
@@ -458,11 +597,12 @@ void readFromWiiTHrottle() {
   char x = wifiClient.read();
   prefix += x;
   receivedLine += x;
+  int rosterIndex = -1;
   if (trackPowerCollecting == true) {
     if (x == '\n') {
       //Serial.println(receivedLine);
       String cTrackPowerState = receivedLine.substring(3, 4);
-      //Serial.println("Track power message "+cTrackPowerState+" - ");
+      Serial.println("Track power message "+cTrackPowerState+" - ");
       if (cTrackPowerState == "1") {
         trackPowerState = true;
       }
@@ -501,6 +641,7 @@ void readFromWiiTHrottle() {
         String locoAddress = roster[r].IdType + roster[r].Id;
         if (locoAddress == address) {
           rosterIndexToUpdate = r;
+          rosterIndex = rosterIndexToUpdate;
           //Serial.println("Matched loco " + roster[r].Name);
           break;
         }
@@ -508,7 +649,7 @@ void readFromWiiTHrottle() {
       if (actionType == "V") {
         //velocity/speed
         if (throttles[iThrottleIndex - 1].rosterIndex > -1) {
-          int originalKnobPosition = throttles[iThrottleIndex - 1].SpeedStep;
+          int originalKnobPosition = throttles[iThrottleIndex - 1].speedStep;
           int newSpeed = actionInstruction.toInt();
           int diff = newSpeed -  roster[rosterIndexToUpdate].currentSpeed;
           if (diff > 5 || diff < -5)
@@ -517,7 +658,7 @@ void readFromWiiTHrottle() {
             //Serial.println("Set " + roster[rosterIndexToUpdate].Name + " to speed " + String(roster[rosterIndexToUpdate].currentSpeed));
             //Serial.println("Action type " + actionType + " instruction " + actionInstruction + " controller " + String(throttleIndex));
             if (throttles[iThrottleIndex - 1].rosterIndex == rosterIndexToUpdate) {
-              throttles[iThrottleIndex - 1].SpeedStep = roster[rosterIndexToUpdate].currentSpeed;
+              throttles[iThrottleIndex - 1].speedStep = roster[rosterIndexToUpdate].currentSpeed;
               Serial.println("Set active controller roster knob speed");
             }
             int diff = originalKnobPosition -  roster[rosterIndexToUpdate].currentSpeed;
@@ -526,6 +667,7 @@ void readFromWiiTHrottle() {
             for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
               if (throttles[i].rosterIndex == rosterIndexToUpdate) {
                 drawThrottle(i);
+                drawSelectedThrottle(i);
                 Serial.println("Speed update on throttle " + String(i));
               }
             }
@@ -536,9 +678,15 @@ void readFromWiiTHrottle() {
         //direction
         roster[rosterIndexToUpdate].currentDirection = actionInstruction.toInt();
         Serial.println("Set " + roster[rosterIndexToUpdate].Name + " to direction " + String(roster[rosterIndexToUpdate].currentDirection));
+        if (roster[rosterIndexToUpdate].initialResponseIncoming) {
+          roster[rosterIndexToUpdate].initialResponseIncoming = false;
+          roster[rosterIndexToUpdate].functionButtonUpdateRequired = true;
+          Serial.println("Initial response complete, function button update required");
+        }
         for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
           if (throttles[i].rosterIndex == rosterIndexToUpdate) {
             drawThrottle(i);
+            drawSelectedThrottle(i);
             Serial.println("Dir update on throttle " + String(i));
           }
         }
@@ -558,8 +706,15 @@ void readFromWiiTHrottle() {
         int iFunctionState = functionState.toInt();
         int iFunctionAddress = functionAddress.toInt();
 
-        // Serial.println("Function - " + roster[rosterIndexToUpdate].Name + "storing state " + functionState + " for address " + functionAddress);
-        roster[rosterIndexToUpdate].functionState[iFunctionAddress] = iFunctionState;
+        Serial.println("Function - " + roster[rosterIndexToUpdate].Name + "storing state " + functionState + " for address " + functionAddress);
+
+        if (iFunctionAddress < maxFunctions) {
+          roster[rosterIndexToUpdate].functionState[iFunctionAddress] = iFunctionState;
+          if (!roster[rosterIndexToUpdate].initialResponseIncoming) {
+            Serial.println("Initisl response complete, function button update required");
+            roster[rosterIndexToUpdate].functionButtonUpdateRequired = true;
+          }
+        }
       }
 
       actionReceivedLine = "";
@@ -624,6 +779,12 @@ void readFromWiiTHrottle() {
       //Serial.println("Roster complete");
 
     }
+    else if (actionCollecting) {
+      if (rosterIndex >= 0) {
+        //drawFunctionButtons(rosterIndex);
+      }
+
+    }
 
     rosterCollecting = false;
     actionReceivedLine = "";
@@ -675,6 +836,7 @@ void connect() {
 
   mqttClient.subscribe(selectorMovementTopic);
   mqttClient.subscribe(cabSignalTopic);
+  mqttClient.subscribe(speedMovementTopic);
 }
 
 
@@ -871,6 +1033,6 @@ unsigned int rainbow(byte value)
 }
 
 void clearThrottleScreen(int i) {
-  Serial.println("X " + String(throttles[i].tftX) + " Y " + String(throttles[i].tftY));
+  Serial.println("Clear throttle screen - X " + String(throttles[i].tftX) + " Y " + String(throttles[i].tftY));
   lcd.fillRect( throttles[i].tftX, throttles[i].tftY, 160, 160, TFT_BLACK);
 }

@@ -17,7 +17,7 @@ class Throttle {
     int tftY;
     int tftXEnd;
     int tftYEnd;
-    int SpeedStep;
+    int speedStep;
     int currentSelectorRosterIndex;
     int newSelectedRosterIndex;
     bool isSelected;

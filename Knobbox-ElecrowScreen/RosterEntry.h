@@ -14,7 +14,9 @@ class RosterEntry {
     int currentDirection;
     int currentControllerIndex;
     int currentSpeed;
-    bool functionState[128];
+    bool functionState[68];
+    bool initialResponseIncoming;
+    bool functionButtonUpdateRequired;
 
 };
 

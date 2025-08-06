@@ -12,8 +12,8 @@ Throttle::Throttle(String MTIndex, int tftLocationX, int tftLocationY, int tftLo
 {
   rosterIndex = 0;
   signalAspect = 'X';
-  SpeedStep = 45;
-  newSelectedRosterIndex = 2;
+  speedStep = 0;
+  newSelectedRosterIndex = -1;
   isSelected = false;
-  rosterIndex = 17;
+  rosterIndex = -1;
 }

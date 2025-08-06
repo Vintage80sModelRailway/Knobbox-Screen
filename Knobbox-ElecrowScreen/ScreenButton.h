@@ -19,6 +19,7 @@ class ScreenButton {
     uint16_t boxColour;
     uint16_t textColour;
     uint16_t selectedTextColour;
+    unsigned long millisWhenPressed;
     ScreenButton(String ButtonText, int tftLocationX, int tftLocationY, int tftLocationEndX, int tftLocationYEnd, uint16_t BoxColour, uint16_t TextColour, uint16_t SelectedTextColour, int FunctionIndex = -1);
 };
 
