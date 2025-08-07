@@ -340,17 +340,20 @@ void messageReceived(String &topic, String &payload) {
       if (payload == "C") {
         changeSpeed(i, 1);
         drawThrottle(i);
-        drawSelectedThrottle(i);
+        if (throttles[i].isSelected)
+          drawSelectedThrottle(i);
       }
       else if (payload == "AC") {
         changeSpeed(i, -1);
         drawThrottle(i);
-        drawSelectedThrottle(i);
+        if (throttles[i].isSelected)
+          drawSelectedThrottle(i);
       }
       else if (payload = "SEL") {
         changeSpeed(i, 0);
         drawThrottle(i);
-        drawSelectedThrottle(i);
+        if (throttles[i].isSelected)
+          drawSelectedThrottle(i);
       }
     }
   }
@@ -704,7 +707,8 @@ void readFromWiiTHrottle() {
             for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
               if (throttles[i].rosterIndex == rosterIndexToUpdate) {
                 drawThrottle(i);
-                drawSelectedThrottle(i);
+                if (throttles[i].isSelected)
+                  drawSelectedThrottle(i);
                 Serial.println("Speed update on throttle " + String(i));
               }
             }
