@@ -28,7 +28,7 @@ String Controller::GetMovement() {
   if (PinA_value != PinA_prev && PinA_value == HIGH) {
     //bool dtChanged = dt.UpdateSensor();
     int dtVal = dt.value;
-    Serial.println(String(dtVal));
+    //Serial.println(String(dtVal));
     
     if (dtVal == HIGH) {
       movement = "AC";
@@ -49,19 +49,19 @@ String Controller::GetMovement() {
     if (newButtonState == HIGH) {
       //Serial.println("Button Pressed");
       ButtonState = 1;    
-      Serial.println("Button change pressed"); 
+      //Serial.println("Button change pressed"); 
+      movement = "SEL";
     }
     else {
       //Serial.println("Button Released");
       ButtonState = 0;
-      Serial.println("Button change released");
-      movement = "SEL";
+      //Serial.println("Button change released");      
     }
   }
   else {
     if (ButtonState == 1 && (millis() - millisAtButtonPress > 1000) && buttonIsHeld == 0) {
       buttonIsHeld = 1;
-      Serial.println("Button held");
+      //Serial.println("Button held");
     }    
   }
   

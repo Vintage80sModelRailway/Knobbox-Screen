@@ -42,7 +42,7 @@ RosterEntry roster[ROSTER_SIZE];
 
 const char* ssid     = SECRET_SSID;
 const char* password = SECRET_PASS;
-const char * clientName = "KnobBoxTFT";
+const char * clientName = "KnobBoxTFT70";
 const uint16_t port = 1883;
 const char * server = "192.168.1.29";
 String cabSignalTopic = "layout/cabsignal/";
@@ -88,7 +88,7 @@ ScreenButton fButtons[NUMBER_OF_BUTTONS] = {
 };
 
 void setup() {
-  Serial.begin (19200);
+  Serial.begin (115200);
   lcd.init();
   lcd.fillScreen(TFT_BLACK);
   WiFi.begin(ssid, password);
@@ -199,7 +199,7 @@ void drawPermanentButtons() {
 }
 
 void drawFunctionButtons(int throttleIndex) {
-
+  Serial.println("Draw function buttons");
   int fButtonIndex = -1;
   for (int i = 0; i < NUMBER_OF_BUTTONS; i++) {
     //Serial.println("Button 1 is function " + String(fButtons[i].isFunction));
@@ -221,12 +221,14 @@ void drawFunctionButtons(int throttleIndex) {
         lcd.drawCentreString(fButtons[i].buttonText, fButtons[i].tftX + middle, fButtons[i].tftY + 10, 4);
       }
     }
-    else if (!fButtons[i].isFunction) {
+    /*
+      else if (!fButtons[i].isFunction) {
       lcd.drawRect(fButtons[i].tftX, fButtons[i].tftY, (fButtons[i].tftXEnd - fButtons[i].tftX), (fButtons[i].tftYEnd - fButtons[i].tftY), fButtons[i].boxColour);
       lcd.setTextColor(fButtons[i].textColour, TFT_BLACK);
       int middle = (fButtons[i].tftXEnd - fButtons[i].tftX) / 2;
       lcd.drawCentreString(fButtons[i].buttonText, fButtons[i].tftX + middle, fButtons[i].tftY + 10, 4);
-    }
+      }
+    */
   }
 }
 
@@ -298,24 +300,31 @@ void clearThrottle(int i) {
 }
 
 void messageReceived(String &topic, String &payload) {
-  Serial.println("incoming: " + topic + " - " + payload);
+
   String strTopic = (String)topic;
   int posLast = strTopic.lastIndexOf("/");
   int posFirst = strTopic.indexOf("/");
   String justTheID = strTopic.substring(posLast + 1);
+  String topicWithoutID = strTopic.substring(0, posLast + 1);
   bool signalAspectHasChanged = false;
+  Serial.println("incoming: " + topic + " - " + payload + " - derived ID = " + justTheID + " - base topic " + topicWithoutID);
   for (int i = 0; i < NUMBER_OF_THROTTLES; i++) {
-    if (roster[throttles[i].rosterIndex].Id == justTheID && topic == cabSignalTopic) {
-      char aspect = payload.charAt(0);
-      Serial.println("Found signal set throttle for " + roster[throttles[i].rosterIndex].Name + " - " + String(aspect));
-      if (aspect != throttles[i].signalAspect) {
-        Serial.println("Aspect changed from " + String(throttles[i].signalAspect) + " to " + String(aspect));
-        throttles[i].signalAspect = aspect;
-        signalAspectHasChanged = true;
-        drawSignal(i);
+    if (topicWithoutID == cabSignalTopic) {
+      if (roster[throttles[i].rosterIndex].Id == justTheID) {
+        char aspect = payload.charAt(0);
+        Serial.println("Found signal set throttle for " + roster[throttles[i].rosterIndex].Name + " - " + String(aspect));
+        if (aspect != throttles[i].signalAspect) {
+          Serial.println("Aspect changed from " + String(throttles[i].signalAspect) + " to " + String(aspect));
+          throttles[i].signalAspect = aspect;
+          signalAspectHasChanged = true;
+          drawSignal(i);
+          drawSelectedThrottleSignal(i);
+        }
       }
     }
     else if (topic == selectorMovementTopic && throttles[i].isSelected) {
+      throttles[i].lastSelectionActivity = millis();
+      throttles[i].inSelectionMode = true;
       if (payload == "C") {
         throttles[i].currentSelectorRosterIndex++;
         if (throttles[i].currentSelectorRosterIndex >= rosterCounter)
@@ -334,6 +343,7 @@ void messageReceived(String &topic, String &payload) {
       }
       else if (payload = "SEL") {
         changeSelectedLoco(i);
+        throttles[i].inSelectionMode = false;
       }
     }
     else if (topic == speedMovementTopic && throttles[i].isSelected) {
@@ -411,7 +421,18 @@ void changeSpeed(int throttleIndex, int speedChange) {
   if (newSpeed < 0) newSpeed = 0;
   if (newSpeed > 126) newSpeed = 126;
   if (speedChange == 0) {
-    throttles[throttleIndex].speedStep = 0;
+    if (throttles[throttleIndex].speedStep > 0) {
+      throttles[throttleIndex].speedStep = 0;
+    }
+    else {
+      //change direction
+      bool oldDir = roster[throttles[throttleIndex].rosterIndex].currentDirection;
+      roster[throttles[throttleIndex].rosterIndex].currentDirection = !oldDir;
+      String dir =  "M" + throttles[throttleIndex].mtIndex + "A" + roster[throttles[throttleIndex].rosterIndex].IdType + roster[throttles[throttleIndex].rosterIndex].Id + "<;>R" + String(roster[throttles[throttleIndex].rosterIndex].currentDirection) + "\n";
+      Serial.print("OK to change direction from " + String(oldDir) + " to " + String(roster[throttles[throttleIndex].rosterIndex].currentDirection) + " - " + dir);
+      writeString(dir);
+      drawThrottle(throttleIndex);
+    }
   }
   else {
     throttles[throttleIndex].speedStep = newSpeed;
@@ -450,12 +471,26 @@ void loop() {
         drawFunctionButtons(i);
         roster[throttles[i].rosterIndex].functionButtonUpdateRequired = false;
       }
+
+      //time out any selection that's been abandoned
+      if (millis() - throttles[i].lastSelectionActivity > 7000 && throttles[i].inSelectionMode && throttles[i].isSelected) {
+        lcd.fillRect(320, 0, 270, 480, TFT_BLACK);
+        lcd.fillRect(580, 130, 220, 350, TFT_BLACK);
+
+        drawSelectedThrottle(i);
+        drawSelectedTrainNameCentered(445, 30, roster[throttles[i].rosterIndex].Name, 4);
+        drawSelectedTrainNameCentered(445, 80, String(roster[throttles[i].rosterIndex].Id), 4);
+        drawSelectedThrottleSignal(i);
+        drawFunctionButtons(i);
+        throttles[i].inSelectionMode = false;
+      }
+
     }
   }
 
   int32_t x, y;
   if (lcd.getTouch(&x, &y)) {
-    //Serial.printf("X:%d Y:%d\n", x, y);
+    Serial.printf("X:%d Y:%d\n", x, y);
     //lcd.fillCircle(x, y, 15, TFT_WHITE);
     if (!screenPressDetected) {
       int throttleIndex = GetThrottleIndexFromXY(x, y);
@@ -510,6 +545,7 @@ void processButtonPress(int buttonIndex, bool pressed) {
 
         throttles[i].TrainName = "";
         throttles[i].rosterIndex = -1;
+        throttles[i].speedStep = 0;
 
         selectThrottle(i);
       }

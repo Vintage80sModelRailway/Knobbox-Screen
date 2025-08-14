@@ -21,6 +21,8 @@ class Throttle {
     int currentSelectorRosterIndex;
     int newSelectedRosterIndex;
     bool isSelected;
+    unsigned long lastSelectionActivity;
+    bool inSelectionMode;
     Throttle(String MTIndex, int tftLocationX, int tftLocationY, int tftLocationEndX, int tftLocationYEnd);
 };
 
